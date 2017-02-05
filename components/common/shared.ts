@@ -233,13 +233,17 @@ export class ColumnEditorTemplateLoader {
     @Input() column: any;
     
     @Input() rowData: any;
-            
+
+    @Input() rowIndex: number;
+    
+
     constructor(public viewContainer: ViewContainerRef) {}
     
     ngOnInit() {
         let view = this.viewContainer.createEmbeddedView(this.column.editorTemplate, {
             '\$implicit': this.column,
-            'rowData': this.rowData
+            'rowData': this.rowData,
+            'rowIndex': this.rowIndex
         });
     }
 }
