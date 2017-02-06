@@ -108,7 +108,7 @@ export class RowExpansionLoader {
                 <input type="text" pInputText class="ui-column-filter" [attr.placeholder]="col.filterPlaceholder" *ngIf="col.filter&&!col.filterTemplate" [value]="dt.filters[col.field] ? dt.filters[col.field].value : ''" 
                     (click)="dt.onFilterInputClick($event)" (keyup)="dt.onFilterKeyup($event.target.value, col.field, col.filterMatchMode)"/>
                 <p-columnFilterTemplateLoader [column]="col" *ngIf="col.filterTemplate"></p-columnFilterTemplateLoader>
-                <p-dtCheckbox *ngIf="col.selectionMode=='multiple'" (onChange)="dt.toggleRowsWithCheckbox($event)" [checked]="dt.allSelected" [disabled]="dt.isEmpty()"></p-dtCheckbox>
+                <p-dtCheckbox *ngIf="col.selectionMode=='multiple'" (onChange)="dt.toggleRowsWithCheckbox($event)" [checked]="dt.allSelected" [disabled]="dt.isEmpty()||dt.isAllRowsDisabled()"></p-dtCheckbox>
             </th>
         </template>
     `
@@ -155,8 +155,8 @@ export class ColumnFooters {
                 </td>
             </tr>
             <tr #rowElement *ngIf="!dt.expandableRowGroups||dt.isRowGroupExpanded(rowData)" [class]="dt.getRowStyleClass(rowData,rowIndex)"
-                    (click)="dt.handleRowClick($event, rowData)" (dblclick)="dt.rowDblclick($event,rowData)" (contextmenu)="dt.onRowRightClick($event,rowData)" (touchstart)="dt.handleRowTap($event, rowData)"
-                    [ngClass]="{'ui-datatable-even':even&&dt.rowGroupMode!='rowspan','ui-datatable-odd':odd&&dt.rowGroupMode!='rowspan','ui-state-highlight': dt.isSelected(rowData)}">
+                    (click)="dt.handleRowClick($event, rowData, rowIndex)" (dblclick)="dt.rowDblclick($event,rowData)" (contextmenu)="dt.onRowRightClick($event,rowData, rowIndex)" (touchstart)="dt.handleRowTap($event, rowData, rowIndex)"
+                    [ngClass]="{'ui-datatable-even':even&&dt.rowGroupMode!='rowspan','ui-datatable-odd':odd&&dt.rowGroupMode!='rowspan','ui-state-highlight': dt.isSelected(rowData),'ui-state-disabled': !dt.isSelectable(rowIndex)}">
                 <template ngFor let-col [ngForOf]="columns" let-colIndex="index">
                     <td #cell *ngIf="!dt.rowGroupMode || (dt.rowGroupMode == 'subheader') ||
                         (dt.rowGroupMode=='rowspan' && ((dt.sortField==col.field && dt.rowGroupMetadata[dt.resolveFieldData(rowData,dt.sortField)].index == rowIndex) || (dt.sortField!=col.field)))"
@@ -177,7 +177,7 @@ export class ColumnFooters {
                             <span class="ui-row-toggler fa fa-fw ui-c" [ngClass]="{'fa-chevron-circle-down':dt.isRowExpanded(rowData), 'fa-chevron-circle-right': !dt.isRowExpanded(rowData)}"></span>
                         </a>
                         <p-dtRadioButton *ngIf="col.selectionMode=='single'" (onClick)="dt.selectRowWithRadio($event, rowData)" [checked]="dt.isSelected(rowData)"></p-dtRadioButton>
-                        <p-dtCheckbox *ngIf="col.selectionMode=='multiple'" (onChange)="dt.toggleRowWithCheckbox($event,rowData)" [checked]="dt.isSelected(rowData)"></p-dtCheckbox>
+                        <p-dtCheckbox *ngIf="col.selectionMode=='multiple'" (onChange)="dt.toggleRowWithCheckbox($event,rowData)" [checked]="dt.isSelected(rowData)" [disabled]="!dt.isSelectable(rowIndex)"></p-dtCheckbox>
                     </td>
                 </template>
             </tr>
@@ -375,6 +375,8 @@ export class DataTable implements AfterViewChecked,AfterViewInit,AfterContentIni
     @Input() selectionMode: string;
 
     @Input() selection: any;
+
+    @Input() selectableRows: boolean[];
 
     @Output() selectionChange: EventEmitter<any> = new EventEmitter();
 
@@ -1002,7 +1004,7 @@ export class DataTable implements AfterViewChecked,AfterViewInit,AfterContentIni
         }
     }
     
-    handleRowClick(event, rowData) {
+    handleRowClick(event, rowData, rowIndex) {
         if(this.rowTouch) {
             this.rowTouch = false;
             return false;
@@ -1012,7 +1014,7 @@ export class DataTable implements AfterViewChecked,AfterViewInit,AfterContentIni
         if(targetNode == 'TD' || (targetNode == 'SPAN' && !this.domHandler.hasClass(event.target, 'ui-c'))) {
             this.onRowClick.next({originalEvent: event, data: rowData});
             
-            if(!this.selectionMode) {
+            if(!this.selectionMode || !this.isSelectable(rowIndex)) {
                 return;
             }
             
@@ -1051,14 +1053,14 @@ export class DataTable implements AfterViewChecked,AfterViewInit,AfterContentIni
         }
     }
 
-    handleRowTap(event, rowData) {
+    handleRowTap(event, rowData,rowIndex) {
         this.rowTouch = true;
         
         let targetNode = event.target.nodeName;
         if(targetNode == 'TD' || (targetNode == 'SPAN' && !this.domHandler.hasClass(event.target, 'ui-c'))) {
             this.onRowClick.next({originalEvent: event, data: rowData});
             
-            if(!this.selectionMode) {
+            if(!this.selectionMode || !this.isSelectable(rowIndex)) {
                 return;
             }
             
@@ -1117,7 +1119,7 @@ export class DataTable implements AfterViewChecked,AfterViewInit,AfterContentIni
     
     toggleRowsWithCheckbox(event) {
         if(event.checked)
-            this.selection = this.dataToRender.slice(0);
+            this.selection = this.dataToRender.filter((dataRow,index)=>{return this.isSelectable(index)});
         else
             this.selection = [];
             
@@ -1126,12 +1128,12 @@ export class DataTable implements AfterViewChecked,AfterViewInit,AfterContentIni
         this.onHeaderCheckboxToggle.emit({originalEvent: event, checked: event.checked});
     }
     
-    onRowRightClick(event, rowData) {
+    onRowRightClick(event, rowData, rowIndex) {
         if(this.contextMenu) {
             let selectionIndex = this.findIndexInSelection(rowData);
-            let selected = selectionIndex != -1;
+            let selected = selectionIndex != -1 ;
             
-            if(!selected) {
+            if(!selected && this.isSelectable(rowIndex)) {
                 if(this.isSingleSelectionMode()) {
                     this.selection = rowData;
                     this.selectionChange.emit(rowData);
@@ -1174,18 +1176,31 @@ export class DataTable implements AfterViewChecked,AfterViewInit,AfterContentIni
         return index;
     }
 
+    isSelectable(rowIndex) {
+        return (!this.selectableRows) || (this.selectableRows && this.selectableRows[rowIndex])
+    }
+    
+
     isSelected(rowData) {
         return ((rowData && this.domHandler.equals(rowData, this.selection)) || this.findIndexInSelection(rowData) != -1);
     }
-    
+
+    isAllRowsDisabled()
+    {
+        if(!this.selectableRows) return false;
+        return (this.dataToRender.filter((dataRow,index)=>{return this.isSelectable(index)}).length==0)
+    }
+
     get allSelected() {
         let val = true;
-        if(this.dataToRender && this.selection && (this.dataToRender.length <= this.selection.length)) {
+        let i=0;
+        if(this.dataToRender && this.selection &&  !this.isAllRowsDisabled()) {
             for(let data of this.dataToRender) {
-                if(!this.isSelected(data)) {
+                if ((this.isSelectable(i))&&(!this.isSelected(data))) {
                     val = false;
                     break;
                 }
+                i++;
             }
         }
         else {

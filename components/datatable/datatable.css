@@ -64,6 +64,9 @@
 .ui-datatable tr.ui-state-highlight {
     cursor: pointer;
 }
+.ui-datatable tr.ui-state-disabled {
+    opacity: .6;
+}
 
 /* Scrollable */
 .ui-datatable-scrollable-body {
