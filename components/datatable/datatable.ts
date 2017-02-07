@@ -821,8 +821,16 @@ export class DataTable implements AfterViewChecked,AfterViewInit,AfterContentIni
             let metaKey = event.metaKey||event.ctrlKey;
 
             if(this.lazy) {
+                 if(this.sortMode == 'multiple') {
+                    if(!this.multiSortMeta||!metaKey) {
+                        this.multiSortMeta = [];
+                    }
+
+                    this.addSortMeta({field: this.sortField, order: this.sortOrder});
+                }
                 this.stopFilterPropagation = true;
                 this.onLazyLoad.emit(this.createLazyLoadMetadata());
+                
             }
             else {
                 if(this.sortMode == 'multiple') {
