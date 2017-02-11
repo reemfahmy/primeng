@@ -455,7 +455,7 @@ export class DataTable implements AfterViewChecked,AfterViewInit,AfterContentIni
     @Output() onEdit: EventEmitter<any> = new EventEmitter();
 
     @Output() onEditCancel: EventEmitter<any> = new EventEmitter();
-    
+
     @Output() onPage: EventEmitter<any> = new EventEmitter();
         
     @Output() onSort: EventEmitter<any> = new EventEmitter();
@@ -555,6 +555,10 @@ export class DataTable implements AfterViewChecked,AfterViewInit,AfterContentIni
     public rowGroupToggleClick: boolean;
     
     public editingCell: any;
+
+    public editingCol: Column;
+
+    public editingRow: any;
     
     public stopFilterPropagation: boolean;
     
@@ -1404,10 +1408,12 @@ export class DataTable implements AfterViewChecked,AfterViewInit,AfterContentIni
         if(!this.selectionMode && this.editable && column.editable) {           
             if(cell != this.editingCell) {
                 if(this.editingCell && this.domHandler.find(this.editingCell, '.ng-invalid.ng-dirty').length == 0) {
-                    this.domHandler.removeClass(this.editingCell, 'ui-cell-editing');
+                   this.switchCellToViewMode(this.editingCell,this.editingCol,this.editingRow);
                 }
                 
                 this.editingCell = cell;
+                this.editingCol = column;
+                this.editingRow = rowData;
                 this.onEditInit.emit({column: column, data: rowData});
                 this.domHandler.addClass(cell, 'ui-cell-editing');
                 let focusable = this.domHandler.findSingle(cell, '.ui-cell-editor input');
@@ -1418,7 +1424,8 @@ export class DataTable implements AfterViewChecked,AfterViewInit,AfterContentIni
         }
     }
 
-    switchCellToViewMode(element: any) {
+    switchCellToViewMode(element: any, column: Column, rowData: any) {
+        this.onEditComplete.emit({target: element,column: column, data: rowData})
         let cell = this.findCell(element); 
         this.domHandler.removeClass(cell, 'ui-cell-editing');
     }
@@ -1429,9 +1436,9 @@ export class DataTable implements AfterViewChecked,AfterViewInit,AfterContentIni
             
             //enter
             if(event.keyCode == 13) {
-                this.onEditComplete.emit({column: column, data: rowData});
+            
                 this.renderer.invokeElementMethod(event.target, 'blur');
-                this.switchCellToViewMode(event.target);
+                this.switchCellToViewMode(event.target,column,rowData);
                 event.preventDefault();
             }
             
@@ -1439,7 +1446,7 @@ export class DataTable implements AfterViewChecked,AfterViewInit,AfterContentIni
             else if(event.keyCode == 27) {
                 this.onEditCancel.emit({column: column, data: rowData});
                 this.renderer.invokeElementMethod(event.target, 'blur');
-                this.switchCellToViewMode(event.target);
+                this.switchCellToViewMode(event.target,column,rowData);
                 event.preventDefault();
             }
             
