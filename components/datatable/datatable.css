@@ -69,8 +69,17 @@
 }
 
 /* Scrollable */
-.ui-datatable-scrollable-body {
-    overflow:auto;
+.ui-datatable-V-H-scroll {
+        overflow-x: auto;
+      overflow-y: scroll;
+}
+.ui-datatable-V-scroll {
+    overflow-x: hidden;
+    overflow-y: scroll;
+}
+.ui-datatable-H-scroll {
+    overflow-x: scroll;
+    overflow-y: hidden;
 }
 .ui-datatable-scrollable-header {
     overflow: hidden;

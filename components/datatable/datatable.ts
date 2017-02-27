@@ -222,7 +222,8 @@ export class TableBody {
                 </table>
             </div>
         </div>
-        <div #scrollBody class="ui-datatable-scrollable-body" [ngStyle]="{'width': width,'max-height':dt.scrollHeight}">
+        <div #scrollBody class="ui-datatable-scrollable-body" [ngStyle]="{'width': width,'max-height':dt.scrollHeight}"  [ngClass]="{'ui-datatable-V-H-scroll': !dt.hasFooter(),'ui-datatable-V-scroll': dt.hasFooter()}">
+           <div #scrollBodyBox  class="ui-datatable-scrollable-body-box">
             <table [class]="dt.tableStyleClass" [ngStyle]="dt.tableStyle">
                 <colgroup class="ui-datatable-scrollable-colgroup">
                     <col *ngFor="let col of dt.visibleColumns()" />
@@ -230,6 +231,21 @@ export class TableBody {
                 <tbody [ngClass]="{'ui-datatable-data ui-widget-content': true, 'ui-datatable-hoverable-rows': (dt.rowHover||dt.selectionMode)}" [pTableBody]="columns"></tbody>
             </table>
         </div>
+        </div>
+      
+         <div #scrollFooter class="ui-widget-header ui-datatable-scrollable-header ui-datatable-H-scroll" [ngStyle]="{'width': width}" *ngIf="dt.hasFooter()" >
+                <div #scrollFooterBox  class="ui-datatable-scrollable-header-box">
+                <table [class]="dt.tableStyleClass" [ngStyle]="dt.tableStyle">
+                    <tfoot class="ui-datatable-tfoot">
+                        <tr *ngIf="!footerColumnGroup" [pColumnFooters]="columns"></tr>
+                        <template [ngIf]="footerColumnGroup">
+                            <tr *ngFor="let footerRow of footerColumnGroup.rows" [pColumnFooters]="footerRow.columns"></tr>
+                        </template>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+        
     `,
     host:{
         '[class.ui-datatable-scrollable-view]': 'true',
@@ -248,20 +264,34 @@ export class ScrollableView implements AfterViewInit, OnDestroy {
     
     @ViewChild('scrollBody') scrollBodyViewChild: ElementRef;
     
+    @ViewChild('scrollBodyBox') scrollBodyViewBoxChild: ElementRef;
+
+    @ViewChild('scrollFooter') scrollFooterViewChild: ElementRef;
+
+    @ViewChild('scrollFooterBox') scrollFooterBoxViewChild: ElementRef;
+
     @Input() frozen: boolean;
     
     @Input() width: string;
                     
     public scrollBody: any;
     
+    public scrollBodyBox: any;
+
     public scrollHeader: any
     
     public scrollHeaderBox: any;
     
+    public scrollFooter: any
+
+    public scrollFooterBox: any;
+
     public bodyScrollListener: any;
     
     public headerScrollListener: any;
         
+    public footerScrollListener: any;
+
     ngAfterViewInit() {
         this.initScrolling();
     }
@@ -270,6 +300,13 @@ export class ScrollableView implements AfterViewInit, OnDestroy {
         this.scrollHeader = <HTMLDivElement> this.scrollHeaderViewChild.nativeElement;
         this.scrollHeaderBox = <HTMLDivElement> this.scrollHeaderBoxViewChild.nativeElement;
         this.scrollBody = <HTMLDivElement> this.scrollBodyViewChild.nativeElement;
+        this.scrollBodyBox = <HTMLDivElement>this.scrollBodyViewBoxChild.nativeElement;
+        if (this.dt.hasFooter()) {
+            this.scrollFooter = <HTMLDivElement>this.scrollFooterViewChild.nativeElement;
+            this.scrollFooterBox = <HTMLDivElement>this.scrollFooterBoxViewChild.nativeElement;
+        }
+        let scrollBarWidth = this.domHandler.calculateScrollbarWidth();
+        let added = false;
         
         if(!this.frozen) {
             let frozenView = this.el.nativeElement.previousElementSibling;
@@ -277,21 +314,40 @@ export class ScrollableView implements AfterViewInit, OnDestroy {
                 var frozenScrollBody = this.domHandler.findSingle(frozenView, '.ui-datatable-scrollable-body');
             }
             
+            this.headerScrollListener = this.renderer.listen(this.scrollHeader, 'scroll', () => {
+                this.scrollHeader.scrollLeft = 0;
+            });
+
             this.bodyScrollListener = this.renderer.listen(this.scrollBody, 'scroll', () => {
+                if (this.dt.hasFooter()) {
+                    this.scrollBody.scrollLeft = 0;
+                }
+                else {
                 this.scrollHeaderBox.style.marginLeft = -1 * this.scrollBody.scrollLeft + 'px';
                 if(frozenScrollBody) {
                     frozenScrollBody.scrollTop = this.scrollBody.scrollTop;
                 }
+                }
             });
             
-            this.headerScrollListener = this.renderer.listen(this.scrollHeader, 'scroll', () => {
-                this.scrollHeader.scrollLeft = 0;
+
+            if (this.dt.hasFooter()) {
+
+                this.footerScrollListener = this.renderer.listen(this.scrollFooter, 'scroll', () => {
+                    this.scrollHeaderBox.style.marginLeft = -1 * this.scrollFooter.scrollLeft + 'px';
+                    this.scrollBodyBox.style.marginLeft = -1 * this.scrollFooter.scrollLeft + 'px';
+                    if (frozenScrollBody) {
+                        frozenScrollBody.scrollTop = this.scrollFooter.scrollTop;
+                    }
             });
         }
-        
-        let scrollBarWidth = this.domHandler.calculateScrollbarWidth();
-        if(!this.frozen)
+        }
+        if (!this.frozen) {
             this.scrollHeaderBox.style.marginRight = scrollBarWidth + 'px';            
+
+            if (this.scrollFooterBox)
+                this.scrollFooterBox.style.marginRight = scrollBarWidth + 'px';
+        }
         else
             this.scrollBody.style.paddingBottom = scrollBarWidth + 'px';
     }
@@ -303,6 +359,9 @@ export class ScrollableView implements AfterViewInit, OnDestroy {
         if(this.headerScrollListener) {
             this.headerScrollListener();
         }        
+        if (this.footerScrollListener) {
+            this.footerScrollListener();
+        }
     }
 }
 
@@ -1709,7 +1768,7 @@ export class DataTable implements AfterViewChecked,AfterViewInit,AfterContentIni
         else {
             if(this.columns) {
                 for(let i = 0; i  < this.columns.length; i++) {
-                    if(this.columns[i].footer) {
+                    if (this.columns[i].footer || this.columns[i].footerTemplate) {
                         return true;
                     }
                 }
