@@ -93,7 +93,7 @@ export class ConfirmationService {
         return this;
     }
 
-    onAccept() {
-        this.acceptConfirmationSource.next();
+    onAccept(confirmation: Confirmation) {
+        this.acceptConfirmationSource.next(confirmation);
     }
 }
